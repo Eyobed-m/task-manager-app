@@ -29,19 +29,24 @@ public final class TaskStore {
         for (int index = 0; index < rows.size(); index++) {
             String[] fields = rows.get(index).split("\\t", -1);
             try {
-                if (fields.length != 6) {
-                    throw new IllegalArgumentException("Expected six fields");
+                if (fields.length != 6 && fields.length != 8) {
+                    throw new IllegalArgumentException("Expected six or eight fields");
                 }
                 String title = decode(fields[1]);
                 String details = decode(fields[2]);
                 LocalDate dueDate = fields[4].isBlank() ? null : LocalDate.parse(fields[4]);
+                Task.Source source = fields.length == 8
+                        ? Task.Source.valueOf(fields[6]) : Task.Source.MANUAL;
+                String sourceId = fields.length == 8 ? decode(fields[7]) : "";
                 tasks.add(new Task(
                         UUID.fromString(fields[0]),
                         title,
                         details,
                         Task.Priority.valueOf(fields[3]),
                         dueDate,
-                        Boolean.parseBoolean(fields[5])));
+                        Boolean.parseBoolean(fields[5]),
+                        source,
+                        sourceId));
             } catch (IllegalArgumentException exception) {
                 throw new IOException("Invalid task data on line " + (index + 1), exception);
             }
@@ -58,7 +63,9 @@ public final class TaskStore {
                 encode(task.details()),
                 task.priority().name(),
                 task.dueDate() == null ? "" : task.dueDate().toString(),
-                Boolean.toString(task.completed()))).toList();
+                Boolean.toString(task.completed()),
+                task.source().name(),
+                encode(task.sourceId()))).toList();
         Files.write(temporaryFile, rows, StandardCharsets.UTF_8);
         try {
             Files.move(temporaryFile, file, StandardCopyOption.REPLACE_EXISTING,
